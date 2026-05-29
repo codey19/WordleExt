@@ -21,6 +21,20 @@ document.getElementById('footer-right').addEventListener('click', function() {//
 
 //const endpoint = `https://generativelanguage.googleapis.com/v1beta/gemini-1.5-flash:generateText?${API_KEY}`;
 
+
+const clearBtn = document.getElementById('clear-cache');
+if (clearBtn) {
+  clearBtn.addEventListener('click', function() {
+    chrome.runtime.sendMessage({ action: 'clearCache' }, (response) => {
+      if (response && response.success) {
+        console.log('Cache cleared manually.');
+        // reload() is triggered from background, but also reload here as fallback
+        window.location.reload();
+      }
+    });
+  });
+}
+
 chrome.runtime.connect({ name: 'mySidepanel' });
 console.log("This is the side panel");
 
@@ -62,6 +76,15 @@ const init = async() => {
   //var validAnswers = [...letterFrequencies];
   //console.log(validGuesses);
 }
+
+function getTodayString() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+ 
 
 const initStorageCache = chrome.storage.session.get().then((items) => {
   //Object.assign(storageCache, items);
