@@ -1,9 +1,9 @@
 import { askGPT } from "./gpt.js";
-
+ 
 // import { GoogleGenerativeAI } from 'generative-ai';
 const API_KEY = "";
 const apiUrl = 'https://api.openai.com/v1/chat/completions';
-
+ 
 document.getElementById('footer-link').addEventListener('click', function() {//onClick for footer's link
   const url = 'https://www.nytimes.com/games/wordle'; 
   window.open(url, 'popup', 'width=800,height=600');
@@ -12,38 +12,35 @@ document.getElementById('footer-right').addEventListener('click', function() {//
   const url = 'https://www.tomsguide.com/news/what-is-todays-wordle-answer'; 
   window.open(url, 'popup', 'width=800,height=600');
 });
-
-
-// const endpoint = "https://generativelanguage.googleapis.com/v1beta";
-
-// const genAI = new GoogleGenerativeAI(API_KEY);
-// const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
-
-//const endpoint = `https://generativelanguage.googleapis.com/v1beta/gemini-1.5-flash:generateText?${API_KEY}`;
-
-
+ 
 const clearBtn = document.getElementById('clear-cache');
 if (clearBtn) {
   clearBtn.addEventListener('click', function() {
     chrome.runtime.sendMessage({ action: 'clearCache' }, (response) => {
       if (response && response.success) {
         console.log('Cache cleared manually.');
-        // reload() is triggered from background, but also reload here as fallback
         window.location.reload();
       }
     });
   });
 }
-
+ 
+// const endpoint = "https://generativelanguage.googleapis.com/v1beta";
+ 
+// const genAI = new GoogleGenerativeAI(API_KEY);
+// const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
+ 
+//const endpoint = `https://generativelanguage.googleapis.com/v1beta/gemini-1.5-flash:generateText?${API_KEY}`;
+ 
 chrome.runtime.connect({ name: 'mySidepanel' });
 console.log("This is the side panel");
-
+ 
 var allValidGuesses = [];
 var letterFrequencies  = [];
 var validAnswers = [];
 var validGuesses = [];
 var gray = new Set();
-
+ 
 var storageCache = [];
 var numRows = 0;
 var elem = document.getElementById("inner");//progress bar animation
@@ -76,7 +73,7 @@ const init = async() => {
   //var validAnswers = [...letterFrequencies];
   //console.log(validGuesses);
 }
-
+ 
 function getTodayString() {
   const now = new Date();
   const y = now.getFullYear();
@@ -85,12 +82,19 @@ function getTodayString() {
   return `${y}-${m}-${d}`;
 }
  
-
-const initStorageCache = chrome.storage.session.get().then((items) => {
-  //Object.assign(storageCache, items);
-  storageCache = items.rows || [];
+const initStorageCache = new Promise((resolve) => {
+  chrome.storage.local.get(['rows', 'date'], (items) => {
+    const today = getTodayString();
+    if (items.date && items.date !== today) {
+      storageCache = [];
+      resolve({ rows: [], wasReset: true });
+    } else {
+      storageCache = items.rows || [];
+      resolve({ rows: storageCache, wasReset: false });
+    }
+  });
 });
-
+ 
 async function parseCSV(file) {
   const response = await fetch(file);
   const csvString = await response.text();
@@ -102,7 +106,7 @@ async function parseCSV(file) {
   }
   return data;
 }
-
+ 
 function nextGuess(word, colors){//data_states =  empty, tbd, absent, present, correct
   var greenYellow = new Map();
   if(word == "no message")
@@ -173,7 +177,7 @@ function nextGuess(word, colors){//data_states =  empty, tbd, absent, present, c
   // validGuesses = [...arr];
   // validAnswers = [...arr];
 }
-
+ 
 function getFreq(word){
   var lettersOccurrence = new Map();
   for(let i = 0; i < word.length; i++)
@@ -183,7 +187,7 @@ function getFreq(word){
           lettersOccurrence.set(word[i], 1);
   return lettersOccurrence;
 }
-
+ 
 function compareFreq(greenYellow, word){
   var lettersOccurrence = getFreq(word);
   lettersOccurrence.forEach(element => {
@@ -194,14 +198,14 @@ function compareFreq(greenYellow, word){
   });
   return true;
 }
-
+ 
 function sortMap(map) {
   return new Map([...map].sort((a, b) => a[0].localeCompare(b[0])));
 }
-
+ 
 async function checkStats(word){  //antiquated
   console.log("Checking Stats");
-
+ 
   try {
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -226,22 +230,22 @@ async function checkStats(word){  //antiquated
   } catch (error) {
     console.error(error);
   }
-
+ 
   // const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
-
+ 
   // const prompt = "Generate a 5 letter word in all capital letters."
-
+ 
   // const result = await model.generateContent(prompt);
   // const response = await result.response;
   // const text = response.text();
   // console.log(text);
-
+ 
   /*const prompt = "Generate a 5 letter word in all capitals."; using fetch
   const requestBody = {
     "model": "gemini-1.5-flash",
     "prompt": prompt
   };
-
+ 
   try {
     const response = await fetch(`${endpoint}/projects/-/locations/-/models/gemini-1.5-flash:generateText`, {
       method: "POST",
@@ -251,16 +255,14 @@ async function checkStats(word){  //antiquated
       },
       body: JSON.stringify(requestBody)
     });
-
+ 
     const responseData = await response.json();
     const text = responseData.text;
     console.log(text);
   } catch (error) {
     console.error(error);
   }*/
-
-  
-
+ 
   // fetch(endpoint, {
   //   method: "POST",
   //   headers: {
@@ -285,7 +287,7 @@ async function checkStats(word){  //antiquated
   //console.log(`${word} = ${ratio}`);
   // return ratio;
 }
-
+ 
 function getColors(guess, answer){
     var colors = [];
     for(let i = 0; i < guess.length; i++){
@@ -297,7 +299,7 @@ function getColors(guess, answer){
       else if(answer.indexOf(guessLetter) == -1)
         colors[i] = 'absent';
     }
-
+ 
     //inserts repeated letters into display
     for(let i = 0; i < guess.length; i++){
       if(getCharFreq(guess, guess.charAt(i)) > 1 && answer.charAt(i) != guess.charAt(i))
@@ -316,10 +318,18 @@ function getColors(guess, answer){
         freq++;
     return freq;
   }
-
+ 
 init().then(() => {
   console.log()
-  initStorageCache.then(() => {//retrieving data from storage
+  initStorageCache.then(({ rows, wasReset }) => {//retrieving data from storage
+    if (wasReset) {
+      const banner = document.getElementById('new-day-banner');
+      if (banner) {
+        banner.style.display = 'block';
+        banner.textContent = "🎉 New Wordle! Yesterday's hints have been cleared.";
+      }
+    }
+    storageCache = rows;
     //numRows = storageCache.length;
     for(let j = 0; j < storageCache.length; j++){
       let options = storageCache[j];
@@ -373,7 +383,7 @@ init().then(() => {
         width = 100;
       }
       for(let i = 0; i < Math.min(30, bestGuesses.length); i++){//add all guesses to list
-
+ 
         let entry = document.createElement('li');
         var link = document.createElement('a');
         link.href = `https://en.wiktionary.org/wiki/${bestGuesses[i]}`;
@@ -391,7 +401,7 @@ init().then(() => {
     // location.reload();
   });
 });
-
+ 
 const getBestGuesses = (words, numGuesses) => {
   let letterCounts = {};
   for (let i = 0; i < words.length; i++) {
@@ -440,7 +450,7 @@ const getBestGuesses = (words, numGuesses) => {
   }
   return output;
 }
-
+ 
 const calculateWordScore = (letterCounts, word) => {
   let wordScore = 0;
   let countedLetters = {}; 

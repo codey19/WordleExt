@@ -2,7 +2,7 @@
 // chrome.sidePanel
 //   .setPanelBehavior({ openPanelOnActionClick: true })
 //   .catch((error) => console.error(error));
-
+ 
 // chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
 //   if (!tab.url) return;
 //   const url = new URL(tab.url);
@@ -25,7 +25,7 @@ chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((error) => console.error(error));
 //background.js
-
+ 
 var isClosed = true;
 chrome.runtime.onConnect.addListener(function (port) {
   if (port.name === 'mySidepanel') {
@@ -37,28 +37,61 @@ chrome.runtime.onConnect.addListener(function (port) {
     });
   }
 });
-
-var rows = [];
+ 
+function getTodayString() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+ 
+async function getOrResetStorage() {
+  const today = getTodayString();
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['rows', 'date'], (items) => {
+      if (items.date !== today) {
+        chrome.storage.local.set({ rows: [], date: today }, () => {
+          resolve({ rows: [], date: today, wasReset: true });
+        });
+      } else {
+        resolve({ rows: items.rows || [], date: today, wasReset: false });
+      }
+    });
+  });
+}
+ 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "newWord") {
       console.log(`sending message to side panels: ${request.word}`);
       // chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {//direct messaging 
       //   chrome.runtime.sendMessage({ message: request.message });
       // });
-      const options = {
-        action: request.action, 
-        word: request.word,
-        colors: request.colors
-      };   
-      rows.push(options);   
-      chrome.storage.session.set({ 
-        rows
-      }, function() {
-        console.log('Message stored in local storage');
-        if(!isClosed){
-          console.log('Reload Message Sent');
-          chrome.runtime.sendMessage({ action: 'reload' });
-        }
+      getOrResetStorage().then(({ rows }) => {
+        const options = {
+          action: request.action,
+          word: request.word,
+          colors: request.colors
+        };
+        rows.push(options);
+        chrome.storage.local.set({ rows, date: getTodayString() }, function() {
+          console.log('Message stored in local storage');
+          if(!isClosed){
+            console.log('Reload Message Sent');
+            chrome.runtime.sendMessage({ action: 'reload' });
+          }
+        });
       });
+      return true;
     }
+ 
+  if (request.action === "clearCache") {
+    chrome.storage.local.set({ rows: [], date: getTodayString() }, () => {
+      sendResponse({ success: true });
+      if (!isClosed) {
+        chrome.runtime.sendMessage({ action: 'reload' });
+      }
+    });
+    return true;
+  }
 });
